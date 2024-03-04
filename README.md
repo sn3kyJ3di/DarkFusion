@@ -84,13 +84,13 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
 6. **Install Darknet**:
    - There are various verions of Darknet available, at the time this readme was written, the HANK-AI/Darknet version was the most active and is the suggested version.  You can elect to use a different version, but your setup might be more complex
       
-      #### Darknet Options
+   #### Darknet Options
 
-         - [Darknet by Hank-AI](https://github.com/hank-ai/darknet)
+   - [Darknet by Hank-AI](https://github.com/hank-ai/darknet)
 
-         - [Darknet by Umbralada](https://github.com/umbralada/darknet)
+   - [Darknet by Umbralada](https://github.com/umbralada/darknet)
 
-         - [Darknet by AlexeyAB](https://github.com/AlexeyAB/darknet)
+   - [Darknet by AlexeyAB](https://github.com/AlexeyAB/darknet)
 
       > **Disclaimer**: UltraDarkFusion may not fully support all versions of Darknet for visual UI output, although all versions are suitable for training. This is due to variances in output formats across different Darknet versions.
 
