@@ -17,8 +17,6 @@
 - <b>Grounding-DINO:</b> Label anything in your classes.txt.
 - <b>TensorRT Support:</b> Support for .engine on Ultralytics YOLOv8.
 
-
-
 UltraDarkFusion is designed to be modular, enabling easy integration of new algorithms and streamlining the process from dataset preparation to model training.
 
 ## 🚀 Getting Started with Installation
@@ -40,7 +38,6 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
    winget install Microsoft.VisualStudio.2022.Community
   ```
  
-
  **Note**: It's crucial to install Visual Studio before CUDA. If you change your Visual Studio version later, you'll need to reinstall CUDA.
     
       click on the "Windows Start" menu and run "Visual Studio Installer"
@@ -50,11 +47,9 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
       click on Modify in the bottom-right corner, and then click on Yes
       After installation, A system restart is required.  ```
 
-
 #### Installation
 
-### 1. Clone UltraDarkFusion Repository:
-   Clone the repository:
+1. Clone UltraDarkFusion Repository:
    ```sh
    cd C:/
    git clone https://github.com/lordofkillz/DarkFusion.git
@@ -64,24 +59,28 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
 2. **Install Weights From Shared Google Drive**: 
    - Download the SAM folder for Grounding DINO and SAM weights. This complete folder can be obtained from the following source: [SAM Folder Google Drive](https://drive.google.com/file/d/1JLH7kMc6FXdKz1fmoxO5AfLhASDzmpw8/view?usp=sharing). Extract it to `c:/darkfusion/ultradarkfusion` or you will need to change the source code.
 
-   **OPTIONAL** download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
+   - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
 
 2. (Alternative) **Install Weights From Source**: 
    - In the `ultradarkfusion` folder, create a folder called `Sam` and download the checkpoints from [SAM Model Checkpoints](https://github.com/facebookresearch/segment-anything#model-checkpoints).
    - For Grounding DINO checkpoints: [Grounding DINO GitHub](https://github.com/IDEA-Research/GroundingDINO).
 
+   - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
+
 3. **Download Anaconda**:
    - Visit the official Anaconda website at [https://www.anaconda.com/products/distribution](https://www.anaconda.com/products/distribution) and download the appropriate version of Anaconda.
           
 4. **Run the Anaconda Installer**:
-   - Locate the downloaded Anaconda installer executable (.exe) file and run it. During installation, make sure to set the installation path to `c:\DarkFusion\anaconda`.
+   - Locate the downloaded Anaconda installer executable (.exe) file and run it. 
+    - During installation, make sure to set the installation path to `c:\DarkFusion\anaconda`.
 
 5. **Execute fusion_install.bat**:
-   - Once Anaconda is installed, locate the `fusion_install.bat` file in your DarkFusion directory and right-click on it. Choose "Run as administrator" to execute the script.
+   - Once Anaconda is installed, locate the `fusion_install.bat` file in your DarkFusion directory and right-click on it. 
+    - Choose "Run as administrator" to execute the script.
 
 6. **Install Darknet**:
    - There are various verions of Darknet available, at the time this readme was written, the HANK-AI/Darknet version was the most active and is the suggested version.  You can elect to use a different version, but your setup might be more complex
-      # Darknet Options
+      #### Darknet Options
 
       - [Darknet by Hank-AI](https://github.com/hank-ai/darknet) (Currently maintained as of 10/22/2023)
       Discord: [https://discord.gg/fZTz8E44](https://discord.gg/fZTz8E44)
@@ -92,34 +91,19 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
 
       > **Disclaimer**: UltraDarkFusion may not fully support all versions of Darknet for visual UI output, although all versions are suitable for training. This is due to variances in output formats across different Darknet versions.
 
-   - In Hank-AI/Darknet There are various steps in the "Windows CMake Method that are redundant with steps in this installation 
-    - you will not need to instal Git again
-    - You will not need to install CMAKE again
-    - You will not need to install Microsoft Visual Studio 2022 Community again
-    - You will not need to modify your Visual Studio to include "Desktop Development with C++" again
-    - You WILL need to install NSIS
-    - Use CUDA Version 11.8.0_522.06_windows - Download it [here](https://developer.nvidia.com/cuda-11-8-0-download-archive).
-    - Use cuDNN version 8.7.0.84_cuda10 - [NVIDIA Developer](https://developer.nvidia.com/cudnn).
-      - Note: cuDNN versions prior to 9 do not have an excutable installer, you must manually move the files into the right directories and manually add the environment variables path
-         - The folder you extract to should look exactly like this: C:\Program Files\NVIDIA\CUDNN\v8.x
-         - Your system environment path should look like this: 
-            - Variable Name: Path
-            - C:\Program Files\NVIDIA\CUDNN\v8.x\bin
-
-This completes the "Option 1: OpenCL without CUDA" installation.
-
-*Recommended:* Use Visual Studio Code for a smoother experience with the program.Download it here https://code.visualstudio.com/Download
-
-If you prefer not to use Visual Studio Code:
-
-Open Anaconda Prompt.
-Activate the fusion environment by running:
-`conda activate fusion`
-Navigate to the UltraDarkFusion directory:
-`cd C:\DarkFusion\UltraDarkFusion`
-Use the Tab key to auto-complete and select UltraDarkFusion_X.py, then press Enter to start the program.
-For further instructions, refer to the help tab in the program or join the Discord community.
-or simply just double click the .py
+   - In Hank-AI/Darknet There are various steps in the "Windows CMake Method that are redundant with steps in this installation: 
+        - you will not need to instal Git again
+        - You will not need to install CMAKE again
+        - You will not need to install Microsoft Visual Studio 2022 Community again
+        - You will not need to modify your Visual Studio to include "Desktop Development with C++" again
+        - You WILL need to install NSIS
+        - Use CUDA Version 11.8.0_522.06_windows - Download it [here](https://developer.nvidia.com/cuda-11-8-0-download-archive).
+        - Use cuDNN version 8.7.0.84_cuda10 - [NVIDIA Developer](https://developer.nvidia.com/cudnn).
+            - Note: cuDNN versions prior to 9 do not have an excutable installer, you must manually move the files into the right directories and manually add the environment variables path
+                - The folder you extract to should look exactly like this: C:\Program Files\NVIDIA\CUDNN\v8.x
+                - Your system environment path should look like this: 
+                - Variable Name: Path
+                - C:\Program Files\NVIDIA\CUDNN\v8.x\bin
 
 ### Option 2: DNN with CUDA
 
@@ -143,14 +127,12 @@ To ensure a smooth installation process when setting up OpenCV with CUDA support
 
 6. **Ensure you have at least 30 GB of free space for the installation.**
 
-
    ```sh
    winget install git.git
    winget install Kitware.CMake
    winget install Microsoft.VisualStudio.2022.Community
   ```
  
-
  **Note**: It's crucial to install Visual Studio before CUDA. If you change your Visual Studio version later, you'll need to reinstall CUDA.
     
       click on the "Windows Start" menu and run "Visual Studio Installer"
@@ -159,7 +141,6 @@ To ensure a smooth installation process when setting up OpenCV with CUDA support
       select python development
       click on Modify in the bottom-right corner, and then click on Yes
       After installation, A system restart is required.  ```
-
 
 #### Installation
 
@@ -263,6 +244,21 @@ To ensure a smooth installation process when setting up OpenCV with CUDA support
 # Ultralytics
 
 Ultralytics is pre-installed as part of this package. For documentation, visit the [Ultralytics documentation site](https://docs.ultralytics.com/).
+
+# Running UltraDarkFusion
+
+*Recommended:* Use Visual Studio Code for a smoother experience with the program.Download it here https://code.visualstudio.com/Download
+
+If you prefer not to use Visual Studio Code:
+
+Open Anaconda Prompt.
+Activate the fusion environment by running:
+`conda activate fusion`
+Navigate to the UltraDarkFusion directory:
+`cd C:\DarkFusion\UltraDarkFusion`
+Use the Tab key to auto-complete and select UltraDarkFusion_X.py, then press Enter to start the program.
+For further instructions, refer to the help tab in the program or join the Discord community.
+or simply just double click the .py
 
 ---
 
