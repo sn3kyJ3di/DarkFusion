@@ -23,6 +23,7 @@ UltraDarkFusion is designed to be modular, enabling easy integration of new algo
 ## 🚀 Getting Started with Installation
 
 Before diving into the code, let's set up your environment with the necessary build tools. Open up a command prompt and execute the following commands to download Git and CMake. These are essential tools for version control and building the project, respectively Install Git and cmake close the terminal after your done this allows it to refresh otherwise you may recieve and error.
+
 ## Installation Guide
 
 There are two options for installing UltraDarkFusion - Option #1 "OpenCL without CUDA" is the simplier of the two but you may see a slight reduction in performance, Option #2 "DNN with CUDA" is more complex to setup but will likely perform slightly better.  Both options require you to install darknet and it requires you to install CUDA and cuDNN.  Be advised that if you want the installation to go smoothly, you MUST use the exact versions as shown below and the exact folder structure as shown below. You may customize your installation but you will need to make complex modifications to it.
@@ -39,24 +40,26 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
    winget install Microsoft.VisualStudio.2022.Community
   ```
  
- **Note**: It's crucial to install Visual Studio before CUDA. If you change your Visual Studio version later, you'll need to reinstall CUDA.
-    
-      click on the "Windows Start" menu and run "Visual Studio Installer"
-      click on Modify
-      select Desktop Development With C++
-      select python development
-      click on Modify in the bottom-right corner, and then click on Yes
-      After installation, A system restart is required.  ```
+   **Note**: It's crucial to install Visual Studio before CUDA. If you change your Visual Studio version later, you'll need to reinstall CUDA.
+   
+   - click on the "Windows Start" menu and run "Visual Studio Installer"
+   - click on Modify
+   - select Desktop Development With C++
+   - select python development
+   - click on Modify in the bottom-right corner, and then click on Yes
+   - After installation, A system restart is required.  ```
 
 #### Installation
 
 1. Clone UltraDarkFusion Repository:
+
    ```sh
    cd C:/
    git clone https://github.com/lordofkillz/DarkFusion.git
    cd DarkFusion
    mkdir anaconda
    ```
+
 2. **Install Weights**: 
    - **Option #1 Shared Google Drive**:
 
