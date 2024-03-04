@@ -57,16 +57,18 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
    cd DarkFusion
    mkdir anaconda
    ```
-2. **Install Weights From Shared Google Drive**: 
-   - Download the SAM folder for Grounding DINO and SAM weights. This complete folder can be obtained from the following source: [SAM Folder Google Drive](https://drive.google.com/file/d/1JLH7kMc6FXdKz1fmoxO5AfLhASDzmpw8/view?usp=sharing). Extract it to `c:/darkfusion/ultradarkfusion` or you will need to change the source code.
+2. **Install Weights**: 
+   - **Option #1 Shared Google Drive**:
 
-   - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
+      - Download the SAM folder for Grounding DINO and SAM weights. This complete folder can be obtained from the following source: [SAM Folder Google Drive](https://drive.google.com/file/d/1JLH7kMc6FXdKz1fmoxO5AfLhASDzmpw8/view?usp=sharing). Extract it to `c:/darkfusion/ultradarkfusion` or you will need to change the source code.
 
-2. (Alternative) **Install Weights From Source**: 
-   - In the `ultradarkfusion` folder, create a folder called `Sam` and download the checkpoints from [SAM Model Checkpoints](https://github.com/facebookresearch/segment-anything#model-checkpoints).
-   - For Grounding DINO checkpoints: [Grounding DINO GitHub](https://github.com/IDEA-Research/GroundingDINO).
+      - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
 
-   - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
+   - **Option #2 Install Weights From Source**: 
+      - In the `ultradarkfusion` folder, create a folder called `Sam` and download the checkpoints from [SAM Model Checkpoints](https://github.com/facebookresearch/segment-anything#model-checkpoints).
+      - For Grounding DINO checkpoints: [Grounding DINO GitHub](https://github.com/IDEA-Research/GroundingDINO).
+
+      - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
 
 3. **Download Anaconda**:
    - Visit the official Anaconda website at [https://www.anaconda.com/products/distribution](https://www.anaconda.com/products/distribution) and download the appropriate version of Anaconda.
@@ -158,14 +160,18 @@ To ensure a smooth installation process when setting up OpenCV with CUDA support
    mkdir anaconda build install 
    ```
 
-2. **Install Weights From Shared Google Drive**: 
-   - Download the SAM folder for Grounding DINO and SAM weights. This complete folder can be obtained from the following source: [SAM Folder Google Drive](https://drive.google.com/file/d/1JLH7kMc6FXdKz1fmoxO5AfLhASDzmpw8/view?usp=sharing). Extract it to `c:/darkfusion/ultradarkfusion` or you will need to change the source code.
+2. **Install Weights**: 
+   - **Option #1 Shared Google Drive**:
 
-   **OPTIONAL** download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
+      - Download the SAM folder for Grounding DINO and SAM weights. This complete folder can be obtained from the following source: [SAM Folder Google Drive](https://drive.google.com/file/d/1JLH7kMc6FXdKz1fmoxO5AfLhASDzmpw8/view?usp=sharing). Extract it to `c:/darkfusion/ultradarkfusion` or you will need to change the source code.
 
-2. (Alternative) **Install Weights From Source**: 
-   - In the `ultradarkfusion` folder, create a folder called `Sam` and download the checkpoints from [SAM Model Checkpoints](https://github.com/facebookresearch/segment-anything#model-checkpoints).
-   - For Grounding DINO checkpoints: [Grounding DINO GitHub](https://github.com/IDEA-Research/GroundingDINO).
+      - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
+
+   - **Option #2 Install Weights From Source**: 
+      - In the `ultradarkfusion` folder, create a folder called `Sam` and download the checkpoints from [SAM Model Checkpoints](https://github.com/facebookresearch/segment-anything#model-checkpoints).
+      - For Grounding DINO checkpoints: [Grounding DINO GitHub](https://github.com/IDEA-Research/GroundingDINO).
+
+      - OPTIONAL download my weights folder collection of mscoco pretrained .weights, .cfg and .pt its https://drive.google.com/file/d/1hMwNzGi2DnA19SbQdoA0OXCYzk8LwOPP/view?usp=sharing
 
 3. **Download Anaconda**:
    - Visit the official Anaconda website at [https://www.anaconda.com/products/distribution](https://www.anaconda.com/products/distribution) and download the appropriate version of Anaconda.
