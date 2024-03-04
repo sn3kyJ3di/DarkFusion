@@ -48,7 +48,7 @@ from PyQt5.QtCore import (QCoreApplication, QDir, QEvent, QModelIndex, QObject,
 from PyQt5.QtGui import (QBrush, QColor, QFont, QImage, QImageReader,
                          QImageWriter, QKeySequence, QMovie, QPainter, QPen,
                          QPixmap,  QStandardItem,
-                         QStandardItemModel, QTransform, QLinearGradient,QIcon)
+                         QStandardItemModel, QTransform, QLinearGradient,QIcon,QCursor)
 from PyQt5.QtWidgets import (QApplication, QFileDialog,
                              QGraphicsDropShadowEffect, QGraphicsItem,
                              QGraphicsPixmapItem, QGraphicsRectItem,
@@ -76,6 +76,8 @@ import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from PIL import Image, ImageDraw
+from rectpack import newPacker
+
 
 
 class FileChangeHandler(FileSystemEventHandler):
@@ -85,7 +87,6 @@ class FileChangeHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if event.src_path.endswith('.txt') and event.src_path.startswith(self.directory):
-            print(f"{event.src_path} has been modified")
             # Using a lambda to adapt the argument list
             callback = lambda path: self.update_json_callback(path)
             callback(event.src_path)
@@ -264,7 +265,9 @@ class CustomGraphicsView(QGraphicsView):
         # Set the frame shape to NoFrame
         self.setFrameShape(QtWidgets.QFrame.NoFrame)
 
-
+        self.right_click_timer = QTimer()  # Timer to handle right-click hold functionality
+        self.right_click_timer.setInterval(100)  # Set the timer interval to 100ms or any other suitable value
+        self.right_click_timer.timeout.connect(self.remove_box_under_cursor)  # Connect the timer to the removal method
     def _setup_initial_state(self):
 
         self.drawing = False
@@ -303,7 +306,13 @@ class CustomGraphicsView(QGraphicsView):
             if action == delete_action:
                 self._remove_last_drawn_bbox(last_bbox)
 
-
+    def remove_box_under_cursor(self):
+        # This method will be called repeatedly while the right mouse button is held down
+        cursor_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))
+        for item in self.scene().items(cursor_pos):
+            if isinstance(item, BoundingBoxDrawer):
+                self._play_sound_and_remove_bbox(item)
+                break  # Remove only one box per interval
 
     def _get_last_drawn_bbox(self):
         if self.bboxes:
@@ -397,8 +406,10 @@ class CustomGraphicsView(QGraphicsView):
             self._handle_left_button_press(event)  # Handle left mouse button press
         elif event.button() == Qt.RightButton:
             self._handle_right_button_press(event)  # Handle right mouse button press
+            self.right_click_timer.start()  # Start the timer when the right mouse button is pressed
         else:
             super().mousePressEvent(event)  # Call the base class method for other button press events
+
 
     def _handle_left_button_press(self, event):
         if event.modifiers() == Qt.ControlModifier:
@@ -576,7 +587,9 @@ class CustomGraphicsView(QGraphicsView):
 
         if event.button() == Qt.LeftButton:
             self._handle_left_button_release(event)  # Handle left mouse button release
-
+        if event.button() == Qt.RightButton:
+            self.right_click_timer.stop()  # Stop the timer when the right mouse button is released
+            
     def _handle_left_button_release(self, event):
         if self.selected_bbox:
             self._update_selected_bbox()  # Update the selected bounding box
@@ -650,7 +663,7 @@ class CustomGraphicsView(QGraphicsView):
 
 class BoundingBoxDrawer(QGraphicsRectItem):
     MIN_SIZE = 6
-    MAX_SIZE = 1000
+    MAX_SIZE = 100
 
     def __init__(self, x, y, width, height, main_window, class_id=None, confidence=None, unique_id=None):
         super().__init__(x, y, width, height)  # Initialize the base QGraphicsRectItem
@@ -830,7 +843,7 @@ class BoundingBoxDrawer(QGraphicsRectItem):
         color_tab.setPos(position_x, position_y)
 
         # Set class_name_item text color
-        self.class_name_item.setDefaultTextColor(QColor(255, 215, 0))
+        self.class_name_item.setDefaultTextColor(QColor(255, 255, 255))
 
     def hoverEnterEvent(self, event):
         # Bring the item forward by setting a high Z-value
@@ -1495,8 +1508,12 @@ class ScanAnnotations:
             except queue.Empty:
                 continue
 
-            if not os.path.exists(output_path):
+            # Check if the image file exists before processing
+            if os.path.exists(image_path):
                 self.remove_metadata(image_path, output_path)
+            else:
+                print(f"File not found: {image_path}")
+
             self.metadata_queue.task_done()
 
     # Function to add images to the metadata removal queue
@@ -2479,9 +2496,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.save_runs_directory.clicked.connect(self.on_save_dir_clicked)
         self.ultralytics.clicked.connect(self.ultralytics_train_clicked)
 
-        self.inputButton.clicked.connect(self.select_input_directory)
-        self.outputButton.clicked.connect(self.select_output_directory)
-        self.classes.clicked.connect(self.select_classes_file)
 
         self.selected_pytorch_file = None
 
@@ -2654,9 +2668,41 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.image_directory = None  # Initialize the attribute to store the image directory
         self.file_monitoring_thread = None
         self.file_observer = None
-
+        self.clear_json.clicked.connect(self.on_clear_json_clicked)
+        self.super_resolution_Checkbox.clicked.connect(self.checkbox_clicked)
+        self.mosaic_checkbox.stateChanged.connect(self.mosaic_checkbox_changed)
+        self.size_input.valueChanged.connect(self.on_size_input_changed)
+        self.size_number.valueChanged.connect(self.on_size_number_changed)
+        self.augmentation_size = 416  # Default size
+        self.augmentation_count = 100  # Default count
+        self.mosaic_effect = False                  
         self.show()
+        
+    def on_size_input_changed(self, value):
+        self.augmentation_size = value
 
+    def on_size_number_changed(self, value):
+        self.augmentation_count = value
+        
+    def on_clear_json_clicked(self):
+        """
+        This method is triggered when the 'Clear JSON' button is clicked.
+        It deletes all .json files in the current image directory.
+        """
+        if self.image_directory:  # Check if the image directory is set
+            json_files = glob.glob(os.path.join(self.image_directory, '*.json'))
+            if json_files:  # Check if there are any .json files to delete
+                for json_file in json_files:
+                    try:
+                        os.remove(json_file)
+                        print(f"Deleted {json_file}")
+                    except Exception as e:
+                        print(f"Error deleting {json_file}: {str(e)}")
+                QMessageBox.information(None, 'JSON Files Cleared', f"All JSON files have been deleted from {self.image_directory}.")
+            else:
+                QMessageBox.information(None, 'No JSON Files', "No JSON files found in the current directory.")
+        else:
+            QMessageBox.warning(None, 'Directory Not Set', "The image directory has not been set. Please open an image directory first.")
     def on_dropdown_changed(self, index):
         selected_file = self.sam_model.itemText(index)
         self.sam_checkpoint = f'Sam/{selected_file}'
@@ -2683,29 +2729,26 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def predict_and_draw_yolo_objects(self, image, image_file_path):
-        # Early Exit Check
         if not self.predictor or not self.sam or not os.path.isfile(image_file_path):
             logging.error('Predictor, SAM, or image file is not available.')
             QMessageBox.critical(self, "Error", "Predictor, SAM, or image file is not available.")
             return
 
         image_copy = image.copy()
-        masked_image = image_copy  # Initialize masked_image with image_copy
         yolo_file_path = os.path.splitext(image_file_path)[0] + ".txt"
         adjusted_boxes = []
 
-        # Check cache first for file reading
-        if yolo_file_path in self.yolo_cache:
-            yolo_lines = self.yolo_cache[yolo_file_path]
-        else:
-            try:
+        # Read YOLO file or use cache
+        try:
+            yolo_lines = self.yolo_cache.get(yolo_file_path, None)
+            if yolo_lines is None:
                 with open(yolo_file_path, "r") as f:
                     yolo_lines = f.readlines()
-                self.yolo_cache[yolo_file_path] = yolo_lines  # Store contents in cache
-            except Exception as e:
-                logging.error(f'Failed to read yolo file: {e}')
-                QMessageBox.critical(self, "Error", f"Failed to read yolo file: {e}")
-                return
+                self.yolo_cache[yolo_file_path] = yolo_lines
+        except Exception as e:
+            logging.error(f'Failed to read yolo file: {e}')
+            QMessageBox.critical(self, "Error", f"Failed to read yolo file: {e}")
+            return
 
         img_height, img_width = image_copy.shape[:2]
         self.predictor.set_image(image_copy)
@@ -2714,67 +2757,45 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             class_index, x_center, y_center, w, h = map(float, yolo_line.strip().split())
             try:
                 box = pbx.convert_bbox((x_center, y_center, w, h), from_type="yolo", to_type="voc", image_size=(img_width, img_height))
-            except ValueError as e:
-                logging.error(f'Skipping image due to invalid bounding box values: {e}')
-                continue  # This skips the rest of the loop body and proceeds with the next iteration
-            input_box = np.array([box[0], box[1], box[2], box[3]]).reshape(1, 4)
-
-            # Error Handling for Prediction
-            try:
-                masks, _, _ = self.predictor.predict(
-                    point_coords=None,
-                    point_labels=None,
-                    box=input_box[None, :],
-                    multimask_output=False,
-                )
+                input_box = np.array([box[0], box[1], box[2], box[3]]).reshape(1, 4)
+                masks, _, _ = self.predictor.predict(box=input_box[None, :], multimask_output=False)
             except Exception as e:
-                logging.error(f'Prediction failed: {e}')
-                QMessageBox.critical(self, "Error", f"Prediction failed: {e}")
-                return
+                logging.error(f'Error during prediction or bounding box conversion: {e}')
+                continue
 
-            cv2.putText(image, "ORIGINAL", (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
-            cv2.putText(image, "PREDICTED", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-            cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 255, 0.1), thickness=1, lineType=cv2.LINE_AA)
             masked_image, (x_top_left, y_top_left, box_width, box_height) = self.draw_mask_and_bbox(image, masks[0], self.input_points)
+
+            if box_width <= 0 or box_height <= 0:
+                logging.warning(f"Invalid bounding box dimensions: {box_width}x{box_height}. Skipping this box.")
+                continue
 
             x_bottom_right = x_top_left + box_width
             y_bottom_right = y_top_left + box_height
             new_coords = (x_top_left, y_top_left, x_bottom_right, y_bottom_right)
 
-            print(new_coords)
             if self.overwrite:
-                t = pbx.convert_bbox(new_coords, from_type="voc", to_type="yolo", image_size=(img_width, img_height))
-                s = "%d %.6f %.6f %.6f %.6f \n" % (class_index, t[0], t[1], t[2], t[3])  # Use original class_index
-                adjusted_boxes.append(s)
+                try:
+                    t = pbx.convert_bbox(new_coords, from_type="voc", to_type="yolo", image_size=(img_width, img_height))
+                    s = "%d %.6f %.6f %.6f %.6f \n" % (class_index, t[0], t[1], t[2], t[3])
+                    adjusted_boxes.append(s)
+                except Exception as e:
+                    logging.error(f'Error during bounding box conversion: {e}')
+                    continue
+
             image = masked_image
 
         if self.overwrite:
-            # Specify a buffer size; this is 8KB, but you can adjust as needed
-            buffer_size = 8 * 1024
+            try:
+                with open(yolo_file_path, "w") as f:
+                    f.writelines(adjusted_boxes)
+            except Exception as e:
+                logging.error(f'Error writing to YOLO file: {e}')
+                QMessageBox.critical(self, "Error", f"Error writing to YOLO file: {e}")
 
-            with open(yolo_file_path, "wb", buffering=0) as f:
-                with io.BufferedWriter(f, buffer_size=buffer_size) as bf:
-                    # Since BufferedWriter expects bytes, we need to convert our string to bytes
-                    byte_data = ''.join(adjusted_boxes).encode()
-                    bf.write(byte_data)
-            return masked_image
-        else:
-            # Return the original or a suitably processed image when not overwriting
-            return image.copy()
+        return image
 
 
-    def display_current_image(self):
-        if self.current_image_index < 0 or self.current_image_index >= len(self.image_files):
-            print("Invalid image index")
-            return
-        file_name = self.image_files[self.current_image_index]
-        file_path = os.path.join(self.image_directory, file_name)
-        image = cv2.imread(file_path)
-        if image is None:
-            print(f"Failed to load image: {file_path}")
-            return
-        self.show_image(image)  # Updated to use your new show_image method
-
+        
 
     def show_image(self, img):
         # Convert BGR to RGB
@@ -2790,20 +2811,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.screen_view.setSceneRect(QtCore.QRectF(pixmap.rect()))  # Convert QRect to QRectF
         self.screen_view.fitInView(self.screen_view.sceneRect(), QtCore.Qt.KeepAspectRatio)  # Fit the image within the view
 
-    def process_and_display_image(self, image, file_name):  # Define this method to process and display the image
-        resized_image = self.resize_image(image, 800)
-        self.show_image(resized_image)
+
 
 
     def process_batch(self):
+        self.current_image_index = 0  # Start from the first image
         self.stop_labeling = False  # Reset the stop_labeling flag at the start
         self.stop_batch = False
         total_images = len(self.image_files)  # Total number of images to process
-        self.label_progress.setRange(0, total_images)  # Set the range of the progress bar
+        self.label_progress.setRange(0, total_images)  
 
         if not self.image_directory or not self.sam or not self.predictor:  # Changed to self.image_directory
-            QMessageBox.critical(self, "Error", "Please select a folder and model first")
-            return
+                QMessageBox.critical(self, "Error", "Please select a folder and model first")
+                return
 
         # Ensure self.image_files is updated
         self.image_files = sorted(
@@ -2822,14 +2842,17 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             if self.stop_batch or self.stop_labeling:  # Check for stop_labeling flag alongside stop_batch
                 self.batch_running = False
                 break
-            file_path = os.path.join(self.image_directory, file_name)  # Changed to self.image_directory
-            image = self.predict_and_draw_yolo_objects(cv2.imread(file_path), file_path)
-            if image is not None:
-                self.show_image(image)
+            file_path = os.path.join(self.image_directory, file_name)
             image = cv2.imread(file_path)
+
             if image is None:
                 print(f"Failed to load image: {file_path}")
                 continue  # Skip to the next image
+
+            processed_image = self.predict_and_draw_yolo_objects(image, file_path)
+            if processed_image is not None:
+                self.show_image(processed_image)
+
             self.label_progress.setValue(idx + 1)  # Update the progress bar
             QtWidgets.QApplication.processEvents()
 
@@ -2852,14 +2875,29 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def draw_mask_and_bbox(self, image, mask, input_points):
         contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        x_min, y_min, x_max, y_max = float("inf"), float("inf"), float("-inf"), float("-inf")
+        if not contours:
+            logging.error("No contours found in the mask.")
+            return image, (0, 0, 0, 0)
+
+        img_height, img_width = image.shape[:2]
+        x_min, y_min, x_max, y_max = img_width, img_height, 0, 0
+
         for cnt in contours:
             x, y, w, h = cv2.boundingRect(cnt)
-            x_min = min(x_min, x)
-            y_min = min(y_min, y)
-            x_max = max(x_max, x + w)
-            y_max = max(y_max, y + h)
-        x, y, w, h = x_min, y_min, x_max - x_min, y_max - y_min
+            x_min = min(x_min, max(x, 0))
+            y_min = min(y_min, max(y, 0))
+            x_max = max(x_max, min(x + w, img_width))
+            y_max = max(y_max, min(y + h, img_height))
+
+        if x_max <= x_min or y_max <= y_min:
+            logging.error("Invalid bounding box coordinates computed.")
+            return image, (0, 0, 0, 0)
+
+        bbox = (x_min, y_min, x_max - x_min, y_max - y_min)
+
+        # Convert coordinates to integers
+        x, y, w, h = map(int, [x_min, y_min, x_max - x_min, y_max - y_min])
+
         alpha = 0.2
         overlay = image.copy()
         cv2.fillPoly(overlay, contours, (255, 0, 0))
@@ -2869,6 +2907,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.draw_point(image, point[0], point[1], (255, 0, 0), 5)
         return image, (x, y, w, h)
 
+
+
     def update_image_files(self):
         if self.batch_directory:
             self.image_files = [f for f in os.listdir(self.batch_directory)
@@ -2876,14 +2916,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             
 
     def on_dino_label_clicked(self):
-        # Ensure that the image directory has been selected
-        if self.image_directory is not None:
-            # If the directory is selected, pass it to the GroundingDINO function
-            run_groundingdino(self.image_directory)
-        else:
-            # If the directory is not selected, prompt the user to select it
-            QMessageBox.warning(self, 'Directory Not Selected', "Please select an image directory first.")
-            self.open_image_video()  # Call the method that lets the user select the directory
+        self.dino_label.setEnabled(False)  # Disable the button to prevent multiple clicks
+        try:
+            if self.image_directory is not None:
+                run_groundingdino(self.image_directory)
+            else:
+                QMessageBox.warning(self, 'Directory Not Selected', "Please select an image directory first.")
+                self.open_image_video()  # Call the method that lets the user select the directory
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', f"An error occurred: {e}")
+        finally:
+            self.dino_label.setEnabled(True)  # Re-enable the button after processing is done
+
             
     # icon and console output
     def update_icon(self):
@@ -3061,155 +3105,153 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def auto_label_images2(self):
-        logging.info("auto_label_images2 called")
+                logging.info("auto_label_images2 called")
 
-        classes_file_path = os.path.join(self.image_directory, 'classes.txt')
-        if not os.path.exists(classes_file_path):
-            print("Classes file not found.")
-            return
+                classes_file_path = os.path.join(self.image_directory, 'classes.txt')
+                if not os.path.exists(classes_file_path):
+                    print("Classes file not found.")
+                    return
 
-        with open(classes_file_path, 'r') as classes_file:
-            class_labels = [line.strip() for line in classes_file.readlines()]
-        class_indices = list(range(len(class_labels)))
+                with open(classes_file_path, 'r') as classes_file:
+                    class_labels = [line.strip() for line in classes_file.readlines()]
+                class_indices = list(range(len(class_labels)))
 
-        if not hasattr(self, 'model'):
-            print("Model is not initialized.")
-            return
+                if not hasattr(self, 'model'):
+                    print("Model is not initialized.")
+                    return
 
-        total_images = len(self.image_files)
-        self.label_progress.setRange(0, total_images)
+                total_images = len(self.image_files)
+                self.label_progress.setRange(0, total_images)
 
-        overwrite = QMessageBox.question(
-            self, 'Overwrite Labels', "Do you want to overwrite existing labels?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
+                overwrite = QMessageBox.question(
+                    self, 'Overwrite Labels', "Do you want to overwrite existing labels?",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                )
 
-        # Get network height and width from spinboxes
-        network_height = self.network_height.value()
-        network_width = self.network_width.value()
+                # Get network height and width from spinboxes
+                network_height = self.network_height.value()
+                network_width = self.network_width.value()
 
-        # Determine floating point mode
-        is_fp16 = self.fp_select_combobox.currentText() == "FP16"
+                # Determine floating point mode
+                is_fp16 = self.fp_select_combobox.currentText() == "FP16"
 
-        for idx, image_file in enumerate(self.image_files):
-            if self.stop_labeling:
-                print("Labeling stopped by user.")
-                break
+                for idx, image_file in enumerate(self.image_files):
+                    if self.stop_labeling:
+                        print("Labeling stopped by user.")
+                        break
 
-            self.current_file = image_file
-            label_filename = os.path.splitext(os.path.basename(image_file))[0] + '.txt'
-            label_file = os.path.join(self.image_directory, label_filename)
-            label_exists = os.path.exists(label_file)
+                    # Cropping logic inside the loop
+                    if self.crop_true.isChecked():
+                        image = self.read_image(image_file)
+                        desired_height = self.crop_height.value()
+                        desired_width = self.network_width.value()
+                        cropped_image = self.center_crop(image, desired_height, desired_width, image_file)
 
-            # Get image dimensions
-            self.display_image(image_file)
-            with Image.open(image_file) as img:
-                img_width, img_height = img.size
+                        if cropped_image is not None:
+                            # Save the cropped image
+                            self.save_cropped_image(cropped_image, image_file)
+                            # Update image_file to be the path of the cropped image
+                            image_file = os.path.join(self.current_cropped_directory, os.path.basename(image_file))
 
-            conf_threshold = self.confidence_threshold_slider.value() / 100
-            iou_threshold = self.nms_threshold_slider.value() / 100
+                    self.current_file = image_file
+                    label_filename = os.path.splitext(os.path.basename(image_file))[0] + '.txt'
+                    label_file = os.path.join(self.image_directory, label_filename)
+                    label_exists = os.path.exists(label_file)
 
-            try:
-                model_kwargs = {
-                    'conf': conf_threshold,
-                    'iou': iou_threshold,
-                    'imgsz': [network_width, network_height]
-                }
-                if is_fp16:
-                    model_kwargs['half'] = True
+                    # Get image dimensions
+                    self.display_image(image_file)
+                    with Image.open(image_file) as img:
+                        img_width, img_height = img.size
 
-                if self.model_type in ['yolov8', 'yolov8_trt', 'onnx']:
-                    logging.info(f"Processing with {self.model_type}: {image_file}, params={model_kwargs}")
-                    results = self.model(image_file, **model_kwargs)
+                    conf_threshold = self.confidence_threshold_slider.value() / 100
+                    iou_threshold = self.nms_threshold_slider.value() / 100
 
-                else:
-                    raise ValueError(f"Error: Unknown model type '{self.model_type}'. Unable to process predictions.")
-            except Exception as e:
-                logging.error(f"Error during prediction: {e}")
-                continue  # Skip this image and continue with the next
+                    try:
+                        model_kwargs = {
+                            'conf': conf_threshold,
+                            'iou': iou_threshold,
+                            'imgsz': [network_width, network_height]
+                        }
+                        if is_fp16:
+                            model_kwargs['half'] = True
 
-            # Handle pose, segmentation, or object detection based on the task
-            try:
-                results = self.model(image_file)  # Run inference on the imagei a
-                # Handle pose estimation
-                if 'pose' in self.weights_file_path:
-                    keypoints = results.xyxy[0]  # Extract keypoints if the model is for pose estimation
-                    with open(label_file, 'w') as f:
-                        for keypoint in keypoints:
-                            # Writing class, x, y, and confidence for each keypoint
-                            f.write(f"{keypoint[5]} {keypoint[0]} {keypoint[1]} {keypoint[4]}\n")
+                        if self.model_type in ['yolov8', 'yolov8_trt', 'onnx']:
+                            logging.info(f"Processing with {self.model_type}: {image_file}, params={model_kwargs}")
+                            results = self.model(image_file, **model_kwargs)
+                            
 
-                # Handle segmentation
-                elif 'seg' in self.weights_file_path:
-                    segmentation_masks = results.pred[0]  # Extract segmentation masks
-                    # Additional code needed to process and write segmentation data
+                            predicted_labels = results.pred[0][:, -1].int().tolist()
+                            boxes = results.pred[0][:, :-2].cpu().numpy()
+                            # Filter boxes and labels based on class_indices
+                            filtered_boxes = [box for i, box in enumerate(boxes) if predicted_labels[i] in class_indices]
+                            filtered_labels = [label for label in predicted_labels if label in class_indices]
+                            labeled_boxes = list(zip(filtered_boxes, filtered_labels))
 
-                # General object detection
-                else:
-                    predicted_labels = results.pred[0][:, -1].int().tolist()
-                    boxes = results.pred[0][:, :-2].cpu().numpy()
-                    # Filter boxes and labels based on class_indices
-                    filtered_boxes = [box for i, box in enumerate(boxes) if predicted_labels[i] in class_indices]
-                    filtered_labels = [label for label in predicted_labels if label in class_indices]
-                    labeled_boxes = list(zip(filtered_boxes, filtered_labels))
-
-            except AttributeError:  # Handle cases where the model output structure is different
-                results = self.model(self.current_file, classes=class_indices)
-                boxes = results[0].boxes.xyxy.cpu().numpy()
-                class_ids = results[0].boxes.cls.cpu().numpy()
-                labeled_boxes = list(zip(boxes, class_ids))
+                    except AttributeError:  # Handle cases where the model output structure is different
+                        results = self.model(self.current_file, classes=class_indices)
+                        boxes = results[0].boxes.xyxy.cpu().numpy()
+                        class_ids = results[0].boxes.cls.cpu().numpy()
+                        labeled_boxes = list(zip(boxes, class_ids))
 
 
-                # Calculate minimum and maximum width and height based on user settings
-                min_width_px, max_width_px = self.box_size.value() / 100 * img_width, self.max_label.value() / 100 * img_width
-                min_height_px, max_height_px = self.box_size.value() / 100 * img_height, self.max_label.value() / 100 * img_height
+                        # Calculate minimum and maximum width and height based on user settings
+                        min_width_px, max_width_px = self.box_size.value() / 100 * img_width, self.max_label.value() / 100 * img_width
+                        min_height_px, max_height_px = self.box_size.value() / 100 * img_height, self.max_label.value() / 100 * img_height
 
-                # Apply size filtering to the bounding boxes
-                size_filtered_boxes = []
-                for box, class_id in labeled_boxes:
-                    x1, y1, x2, y2 = box
-                    width = x2 - x1
-                    height = y2 - y1
-
-                    # Check if the detected object's dimensions meet the size criteria
-                    if min_width_px <= width <= max_width_px and min_height_px <= height <= max_height_px:
-                        size_filtered_boxes.append((box, class_id))
-
-         
-                # Save the size-filtered labels to a text file
-                if overwrite == QMessageBox.Yes or not label_exists:
-                    with open(label_file, 'w') as f:
-                        for box, class_id in size_filtered_boxes:
+                        # Apply size filtering to the bounding boxes
+                        size_filtered_boxes = []
+                        for box, class_id in labeled_boxes:
                             x1, y1, x2, y2 = box
-                            xc, yc, w, h = (x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1
-                            xc, yc, w, h = xc / img_width, yc / img_height, w / img_width, h / img_height
-                            f.write(f"{int(class_id)} {xc} {yc} {w} {h}\n")
+                            width = x2 - x1
+                            height = y2 - y1
 
-                            # Check if the heads_area checkbox is checked and class_id is not 1
-                            if self.heads_area.isChecked() and class_id != 1:
-                                # Calculate and write the head bounding box
-                                head_x, head_y, head_w, head_h = self.calculate_head_area(x1, y1, x2 - x1, y2 - y1)
-                                head_class_id = int(self.class_id.text())  # Assuming this is the class ID for heads
-                                # Convert head box coordinates to relative format
-                                head_xc, head_yc, head_w, head_h = (head_x + head_w / 2) / img_width, (head_y + head_h / 2) / img_height, head_w / img_width, head_h / img_height
-                                f.write(f"{head_class_id} {head_xc} {head_yc} {head_w} {head_h}\n")
-                else:
-                    print(f"Skipping file {image_file} as it already has labels and overwrite is set to 'No'.")
+                            # Check if the detected object's dimensions meet the size criteria
+                            if min_width_px <= width <= max_width_px and min_height_px <= height <= max_height_px:
+                                size_filtered_boxes.append((box, class_id))
+
+                
+                            # Save the size-filtered labels to a text file
+                            if overwrite == QMessageBox.Yes or not label_exists:
+                                if confidence >= conf_threshold:
+                                    with open(label_file, 'a') as f:
+                                        f.write(f"{int(class_id)} {xc} {yc} {w} {h} {confidence:.4f}\n")
+                                    for box, class_id in size_filtered_boxes:
+                                        x1, y1, x2, y2 = box
+                                        xc, yc, w, h = (x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1
+                                        xc, yc, w, h = xc / img_width, yc / img_height, w / img_width, h / img_height
+                                        f.write(f"{int(class_id)} {xc} {yc} {w} {h}\n")
+
+                                        # Validate head_class_id only if heads_area is checked and class_id is not 1
+                                        if self.heads_area.isChecked() and class_id != 1:
+                                            head_class_id_str = self.class_id.text()
+                                            if head_class_id_str.strip():  # Check if the string is not empty
+                                                try:
+                                                    head_class_id = int(head_class_id_str)
+                                                except ValueError:
+                                                    print(f"Warning: Invalid class ID '{head_class_id_str}'. Using the next available class ID.")
+                                                    head_class_id = self.get_next_available_class_id()
+                                            else:
+                                                print("No class ID provided. Using the next available class ID.")
+                                                head_class_id = self.get_next_available_class_id()
 
 
-            # Update progress bar for each image processed
-            progress_value = (idx + 1) / total_images * 100
-            self.label_progress.setValue(progress_value)
-            QApplication.processEvents()
+                                            # Calculate and write the head bounding box
+                                            head_x, head_y, head_w, head_h = self.calculate_head_area(x1, y1, x2 - x1, y2 - y1)
+                                            # Convert head box coordinates to relative format
+                                            head_xc, head_yc, head_w, head_h = (head_x + head_w / 2) / img_width, (head_y + head_h / 2) / img_height, head_w / img_width, head_h / img_height
+                                            f.write(f"{head_class_id} {head_xc} {head_yc} {head_w} {head_h}\n")
+                            else:
+                                print(f"Skipping file {image_file} as it already has labels and overwrite is set to 'No'.")
 
-        # This block should be outside the for loop
-        self.label_progress.setValue(total_images)
-        QApplication.processEvents()
-        QMessageBox.information(self, "Information", "Finished!")
+                    # Update progress bar for each image processed
+                    progress_value = (idx + 1) / total_images * 100
+                    self.label_progress.setValue(progress_value)
+                    QApplication.processEvents()
 
-
- 
-
+                # This block should be outside the for loop
+                self.label_progress.setValue(total_images)
+                QApplication.processEvents()
+                QMessageBox.information(self, "Information", "Finished!")
 # for blanks
     def on_button_click(self):
         options = QFileDialog.Options()
@@ -3777,10 +3819,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 print("Image or label item is None.")
         except Exception as e:
             print(f"An unexpected error occurred in handle_right_click: {e}")
-
-
-
-
 
     def handle_left_click(self, index):
         row = index.row()
@@ -5194,56 +5232,47 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.move_filtered_images(class_name)
 
     def move_filtered_images(self, class_name):
-        if not class_name:
+        if not class_name and not self.filter_blanks_checkbox.isChecked():
             print("Please enter a class name.")
             return
 
-        # Create a folder for the specified class
-        class_folder = os.path.join(self.image_directory, class_name)
-        os.makedirs(class_folder, exist_ok=True)
+        if class_name:
+            class_folder = os.path.join(self.image_directory, class_name)
+            os.makedirs(class_folder, exist_ok=True)
 
-        # Move filtered images to the class folder
         for file_path in self.filtered_image_files:
             file_name = os.path.basename(file_path)
-            dest_path = os.path.join(class_folder, file_name)
-            try:
-                shutil.move(file_path, dest_path)
-                label_path = os.path.splitext(file_path)[0] + '.txt'
-                dest_label_path = os.path.splitext(dest_path)[0] + '.txt'
-                shutil.move(label_path, dest_label_path)
-                print(f"Moved {file_name} to {class_name} folder.")
-            except Exception as e:
-                print(f"Error moving {file_name}: {str(e)}")
+            base_file = os.path.splitext(file_path)[0]
+            label_path = base_file + '.txt'
+            json_path = base_file + '.json'
 
-        # Check if the "Filter Blanks" option is selected
-        if self.filter_blanks_checkbox.isChecked():
-            # Create a "blank" subfolder within the class folder
-            blank_folder = os.path.join(class_folder, 'blank')
-            os.makedirs(blank_folder, exist_ok=True)
-
-            # Move blank images to the "blank" subfolder
-            for file_path in self.filtered_image_files:
-                base_file = os.path.splitext(file_path)[0]
-                label_path = base_file + '.txt'
-
-                # Check if a label file exists for the image
-                if not os.path.exists(label_path):
-                    continue
-
-                # Read the content of the label file
+            is_blank = False
+            if self.filter_blanks_checkbox.isChecked() and os.path.exists(label_path):
                 with open(label_path, 'r') as f:
                     content = f.read().strip()
+                    is_blank = (content == '')
 
-                # Check if the label file is blank (contains no annotations)
-                if content == '':
-                    file_name = os.path.basename(file_path)
-                    dest_path = os.path.join(blank_folder, file_name)
-                    try:
-                        shutil.move(file_path, dest_path)
-                        shutil.move(label_path, os.path.splitext(dest_path)[0] + '.txt')
-                        print(f"Moved blank image {file_name} to {class_name}/blank folder.")
-                    except Exception as e:
-                        print(f"Error moving blank image {file_name}: {str(e)}")
+            if is_blank:
+                blank_folder = os.path.join(self.image_directory, 'blank')
+                os.makedirs(blank_folder, exist_ok=True)
+                dest_path = os.path.join(blank_folder, file_name)
+            elif class_name:
+                dest_path = os.path.join(class_folder, file_name)
+            else:
+                continue
+
+            try:
+                shutil.move(file_path, dest_path)
+                if os.path.exists(label_path):
+                    dest_label_path = os.path.splitext(dest_path)[0] + '.txt'
+                    shutil.move(label_path, dest_label_path)
+                if os.path.exists(json_path):
+                    dest_json_path = os.path.splitext(dest_path)[0] + '.json'
+                    shutil.move(json_path, dest_json_path)
+                print(f"Moved {'blank image' if is_blank else file_name} to {'blank' if is_blank else class_name} folder.")
+            except Exception as e:
+                print(f"Error moving {'blank image' if is_blank else file_name}: {str(e)}")
+
 
     def on_list_view_clicked(self, index):
         # Get the item at the clicked index
@@ -5435,107 +5464,112 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.file_monitoring_thread = None
 
     def open_image_video(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.ReadOnly
+            options = QFileDialog.Options()
+            options |= QFileDialog.ReadOnly
 
-        # Read the last directory from the settings
-        last_dir = self.settings.get('last_dir', "")
+            # Read the last directory from the settings
+            last_dir = self.settings.get('last_dir', "")
 
-        dir_name = QFileDialog.getExistingDirectory(
-            None, "Open Image Directory", last_dir, options=options)
+            dir_name = QFileDialog.getExistingDirectory(
+                None, "Open Image Directory", last_dir, options=options)
+            placeholder_image_path = 'styles/yolo.jpg'
+            if dir_name:
+                # Stop any existing file monitoring
+                self.stop_file_monitoring()
 
-        if dir_name:
-            # Stop any existing file monitoring
-            self.stop_file_monitoring()
+                # Save the selected directory to the settings
+                self.settings['last_dir'] = dir_name
+                self.saveSettings()  # save the settings after modifying it
 
-            # Save the selected directory to the settings
-            self.settings['last_dir'] = dir_name
-            self.saveSettings()  # save the settings after modifying it
+                self.image_directory = dir_name
 
-            self.image_directory = dir_name
-
-            # Start file monitoring for the selected directory
-            self.file_monitoring_thread = threading.Thread(target=self.start_file_monitoring, args=(dir_name,))
-            self.file_monitoring_thread.daemon = True
-            self.file_monitoring_thread.start()
-            # Import classes.txt
-            classes_file_path = os.path.join(
-                self.image_directory, 'classes.txt')
-            if os.path.exists(classes_file_path):
-                with open(classes_file_path, 'r') as f:
-                    class_names = [line.strip() for line in f.readlines()]
-            else:
-                # If classes.txt does not exist, create one with 'person' as the only class
-                with open(classes_file_path, 'w') as f:
-                    f.write('person\n')
-                class_names = ['person']
-
-            self.valid_classes = list(range(len(class_names)))
-            self.class_names = class_names
-
-            # Initialize the hotkeys for the classes in the current dataset.
-            for className in class_names:
-                class_hotkey_setting = 'classHotkey_{}'.format(className)
-                if class_hotkey_setting not in self.settings:
-                    self.settings[class_hotkey_setting] = ''
+                # Start file monitoring for the selected directory
+                self.file_monitoring_thread = threading.Thread(target=self.start_file_monitoring, args=(dir_name,))
+                self.file_monitoring_thread.daemon = True
+                self.file_monitoring_thread.start()
+                # Import classes.txt
+                classes_file_path = os.path.join(
+                    self.image_directory, 'classes.txt')
+                if os.path.exists(classes_file_path):
+                    with open(classes_file_path, 'r') as f:
+                        class_names = [line.strip() for line in f.readlines()]
                 else:
-                    # If the hotkey is already assigned to a class, remove it from that class.
-                    current_hotkey = self.settings[class_hotkey_setting]
-                    for other_class in self.settings:
-                        if other_class.startswith('classHotkey_') and other_class != class_hotkey_setting:
-                            if self.settings[other_class] == current_hotkey:
-                                self.settings[other_class] = ''
+                    # If classes.txt does not exist, create one with 'person' as the only class
+                    with open(classes_file_path, 'w') as f:
+                        f.write('person\n')
+                    class_names = ['person']
 
-            self.saveSettings()  # Save the settings after modifying the hotkeys
-            # Update the classes dropdown after setting the clasdddddddddddds names
-            self.update_classes_dropdown()
+                self.valid_classes = list(range(len(class_names)))
+                self.class_names = class_names
 
-            # Get all the image files in the directory
-            self.image_files = self.sorted_nicely(
-                glob.glob(os.path.join(dir_name, "*.[pP][nN][gG]")) +
-                glob.glob(os.path.join(dir_name, "*.[jJ][pP][gG]")) +
-                glob.glob(os.path.join(dir_name, "*.[jJ][pP][eE][gG]")) +
-                glob.glob(os.path.join(dir_name, "*.[bB][mM][pP]")) +
-                glob.glob(os.path.join(dir_name, "*.[gG][iI][fF]")) +
-                glob.glob(os.path.join(dir_name, "*.[tT][iI][fF]")) +
-                glob.glob(os.path.join(dir_name, "*.[wW][eE][bB][pP]"))
-            )
-            # Update the QLabel with the total number of imag
+                # Initialize the hotkeys for the classes in the current dataset.
+                for className in class_names:
+                    class_hotkey_setting = 'classHotkey_{}'.format(className)
+                    if class_hotkey_setting not in self.settings:
+                        self.settings[class_hotkey_setting] = ''
+                    else:
+                        # If the hotkey is already assigned to a class, remove it from that class.
+                        current_hotkey = self.settings[class_hotkey_setting]
+                        for other_class in self.settings:
+                            if other_class.startswith('classHotkey_') and other_class != class_hotkey_setting:
+                                if self.settings[other_class] == current_hotkey:
+                                    self.settings[other_class] = ''
 
-            if len(self.image_files) > 0:
-                # Try to get the last opened image from the settings
-                last_image = self.settings.get('lastImage', "")
-                if last_image and last_image in self.image_files:
-                    self.current_image_index = self.image_files.index(last_image)  # Corrected variable name
+                self.saveSettings()  # Save the settings after modifying the hotkeys
+                # Update the classes dropdown after setting the class names
+                self.update_classes_dropdown()
+
+                # Get all the image files in the directory
+                # Get all the image files in the directory
+                self.image_files = self.sorted_nicely(
+                    glob.glob(os.path.join(dir_name, "*.[pP][nN][gG]")) +
+                    glob.glob(os.path.join(dir_name, "*.[jJ][pP][gG]")) +
+                    glob.glob(os.path.join(dir_name, "*.[jJ][pP][eE][gG]")) +
+                    glob.glob(os.path.join(dir_name, "*.[bB][mM][pP]")) +
+                    glob.glob(os.path.join(dir_name, "*.[gG][iI][fF]")) +
+                    glob.glob(os.path.join(dir_name, "*.[tT][iI][fF]")) +
+                    glob.glob(os.path.join(dir_name, "*.[wW][eE][bB][pP]"))
+                )
+
+                # Insert the placeholder image at the beginning of the list
+                if os.path.exists(placeholder_image_path):
+                    if placeholder_image_path not in self.image_files:
+                        self.image_files.insert(0, placeholder_image_path)
+
+                if len(self.image_files) > 0:
+                    # Try to get the last opened image from the settings
+                    last_image = self.settings.get('lastImage', "")
+                    if last_image and last_image in self.image_files and last_image != placeholder_image_path:
+                        self.current_image_index = self.image_files.index(last_image)
+                    else:
+                        # Always start with the placeholder image if no last opened image is found or if the last opened image is the placeholder
+                        self.current_image_index = 0
+
+                    self.current_file = self.image_files[self.current_image_index]
+                    self.total_images.setText("Total Images: {}".format(len(self.image_files)))
+
+                    self.display_image(self.current_file)
+                    self.initialize_yolo()
+
+                    # Populate list view with image files
+                    model = QStandardItemModel()
+                    for img_file in self.image_files:
+                        item = QStandardItem(os.path.basename(img_file))
+                        model.appendRow(item)
+                    self.List_view.setModel(model)
+                    self.display_all_images()
+
+                    # Create empty .txt and .json files
+                    self.create_empty_txt_and_json_files(dir_name)
+
+                    # Start a new thread to calculate and save the labeling statistics
+                    threading.Thread(
+                        target=self.show_labeled_stats, daemon=True).start()
+
                 else:
-                    self.current_image_index = 0  # Reset the current image index
-
-                self.current_file = self.image_files[self.current_image_index]  # Corrected variable name
-                self.total_images.setText("Total Images: {}".format(len(self.image_files)))
-
-                self.display_image(self.current_file)
-                self.initialize_yolo()
-
-                # Populate list view with image files
-                model = QStandardItemModel()
-                for img_file in self.image_files:
-                    item = QStandardItem(os.path.basename(img_file))
-                    model.appendRow(item)
-                self.List_view.setModel(model)
-                self.display_all_images()
-
-                # Create empty .txt and .json files
-                self.create_empty_txt_and_json_files(dir_name)
-
-                # Start a new thread to calculate and save the labeling statistics
-                threading.Thread(
-                    target=self.show_labeled_stats, daemon=True).start()
-
-            else:
-                self.total_images.setText(f"Total Images: 0")
-                QMessageBox.warning(None, 'No Images Found', "No image files found in the directory.")
-                print("No image files found in the directory.")
-
+                    self.total_images.setText(f"Total Images: 0")
+                    QMessageBox.warning(None, 'No Images Found', "No image files found in the directory.")
+                    print("No image files found in the directory.")
 
     def create_empty_txt_and_json_files(self, image_directory):
         image_files = glob.glob(os.path.join(image_directory, "*.[pP][nN][gG]")) + \
@@ -5555,6 +5589,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             if not os.path.exists(json_file):
                 with open(json_file, 'w') as f:
                     json.dump({}, f)  # creates an empty json file
+                    
     def start_file_monitoring(self, directory):
         self.stop_file_monitoring()
         event_handler = FileChangeHandler(directory, self.update_json_file)
@@ -5627,8 +5662,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.current_file = None
         else:
             print("Warning: No image currently loaded.")
-           
-    # start of scene view functions
+        # start of scene view functions
 
     def is_scene_empty(self):
         return all(isinstance(item, QGraphicsPixmapItem) or isinstance(item, QGraphicsTextItem) for item in self.screen_view.scene().items())
@@ -5697,8 +5731,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             return None
 
         if file_name is not None:
-            if not isinstance(file_name, str):
-                print("File name is not a string.")
+            if not isinstance(file_name, str):               
                 return None
 
             # Check if the file_name is the same as the last logged file name
@@ -5724,7 +5757,29 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # Convert the NumPy array to a QImage and then to a QPixmap
             image_qimage = self.cv2_to_qimage(image)
             self.image = QPixmap.fromImage(image_qimage)
+            
+        if self.super_resolution_Checkbox.isChecked() and file_name is not None:
+            # Initialize the super-resolution object
+            sr = cv2.dnn_superres.DnnSuperResImpl_create()
 
+            # Load the desired model
+            path_to_model = "C:/EAL/Scripts/DarkFusion/UltraDarkFusion/Sam/FSRCNN_x4.pb"  # Replace with your FSRCNN model path
+            sr.readModel(path_to_model)
+
+            # Set the model and scale factor
+            sr.setModel("fsrcnn", 4)  # Use "espcn" or "lapsrn" for other models
+
+            # Read the image using OpenCV
+            img = cv2.imread(file_name, cv2.IMREAD_COLOR)
+            
+            # Upscale the image
+            img_sr = sr.upsample(img)
+
+            # Convert the result back to QPixmap to display in the UI
+            height, width, channel = img_sr.shape
+            bytesPerLine = 3 * width
+            qImg = QImage(img_sr.data, width, height, bytesPerLine, QImage.Format_RGB888).rgbSwapped()
+            self.image = QPixmap.fromImage(qImg)
         # If the grayscale_Checkbox is activated, convert image to grayscale
         if self.grayscale_Checkbox.isChecked():
             image_qimage = self.image.toImage()
@@ -5928,34 +5983,44 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         new_index = self.classes_dropdown.findText(label)
         if new_index != -1:
             self.classes_dropdown.setCurrentIndex(new_index)
-            bbox_drawer = BoundingBoxDrawer(
-                x, y, w, h, self, class_id=new_index, confidence=confidence)
+            bbox_drawer = BoundingBoxDrawer(x, y, w, h, self, class_id=new_index, confidence=confidence)
+            self.screen_view.scene().addItem(bbox_drawer)
 
             # Check if the heads_area checkbox is checked
             if self.heads_area.isChecked() and new_index != 1:
-                # Extract class ID from the QLineEdit widget
-                try:
-                    head_class_id = int(self.class_id.text())
-                except ValueError:
-                    print(
-                        f"Warning: Invalid class ID '{self.class_id.text()}' provided in QLineEdit.")
-                    head_class_id = 1  # Default to 1 or another value if the input is not a valid integer
+                head_class_id_str = self.class_id.text()
+                if head_class_id_str.strip():  # Check if the string is not empty
+                    try:
+                        head_class_id = int(head_class_id_str)
+                    except ValueError:
+                        print(f"Warning: Invalid class ID '{head_class_id_str}' provided in QLineEdit. Using the next available class ID.")
+                        head_class_id = self.get_next_available_class_id()
+                else:
+                    print("No class ID provided. Using the next available class ID.")
+                    head_class_id = self.get_next_available_class_id()
 
-                # Add an additional bounding box inside the existing bounding box with the specified class_ID
-                head_x, head_y, head_w, head_h = self.calculate_head_area(
-                    x, y, w, h)
-                head_bbox_drawer = BoundingBoxDrawer(
-                    head_x, head_y, head_w, head_h, self, class_id=head_class_id, confidence=confidence)
-
-                # Add the head_bbox_drawer to the scene
+                head_x, head_y, head_w, head_h = self.calculate_head_area(x, y, w, h)
+                head_bbox_drawer = BoundingBoxDrawer(head_x, head_y, head_w, head_h, self, class_id=head_class_id, confidence=confidence)
                 self.screen_view.scene().addItem(head_bbox_drawer)
-
-            self.screen_view.scene().addItem(bbox_drawer)
+            
             label_file = self.replace_extension_with_txt(self.current_file)
-            self.save_bounding_boxes(label_file, self.screen_view.scene(
-            ).width(), self.screen_view.scene().height())
+            self.save_bounding_boxes(label_file, self.screen_view.scene().width(), self.screen_view.scene().height())
         else:
             print(f"Warning: '{label}' not found in classes dropdown.")
+
+
+    def get_next_available_class_id(self):
+        # Read classes from the file
+        classes_file_path = os.path.join(self.image_directory, 'classes.txt')
+        if os.path.exists(classes_file_path):
+            with open(classes_file_path, 'r') as classes_file:
+                class_labels = [line.strip() for line in classes_file.readlines()]
+            
+            # Convert class labels to integers and find the maximum class ID
+            class_ids = [int(label) for label in class_labels if label.isdigit()]
+            if class_ids:
+                return max(class_ids) + 1  # Next available class ID
+        return 0  # Default to 0 if no classes found or file doesn't exist
 
     def calculate_head_area(self, x, y, w, h):
         # Get the values from the spin boxes
@@ -6782,7 +6847,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         try:
             # Apply a higher-quality Gaussian blur for the bubbled glass effect.
             blurred = cv2.GaussianBlur(image, (15, 15), 0)
-
             # Create the bubbled image
             bubbled = cv2.GaussianBlur(image, (21, 21), 30)
 
@@ -6998,6 +7062,107 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def set_flip_images(self, state):
         self.flip_images = state
+        
+    def mosaic_checkbox_changed(self, state):
+        # Update the mosaic effect based on the checkbox state
+        self.mosaic_effect = (state == Qt.Checked)
+        
+    def pack_thumbnails(self, thumbnail_paths, canvas_size):
+        # Create a packer
+        packer = newPacker(rotation=True)  # Allow rotation
+
+        # Add the canvas (bin)
+        packer.add_bin(*canvas_size)
+
+        # Add each thumbnail (rectangle) to the packer
+        for path in thumbnail_paths:
+            img = Image.open(path)
+            packer.add_rect(*img.size, rid=path)
+
+        # Start packing
+        packer.pack()
+
+        # Get packed rectangles
+        packed_thumbnails = []
+        for rect in packer.rect_list():
+            b, x, y, w, h, rid = rect
+            packed_thumbnails.append((rid, x, y, w, h))
+
+        return packed_thumbnails
+
+    def create_mosaic_images(self):
+        # Make sure necessary attributes are set
+        thumbnail_dir = self.thumbnail_dir
+        canvas_size = (self.augmentation_size, self.augmentation_size)  # Adjusted to be a tuple
+        output_dir = os.path.join(thumbnail_dir, 'mosaic')
+        max_images = self.augmentation_count
+
+        # Define thumbnail_paths with more extensions
+        extensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp']
+        thumbnail_paths = [os.path.join(thumbnail_dir, f) for f in os.listdir(thumbnail_dir)
+                           if os.path.splitext(f)[1].lower() in extensions]
+
+        print(f"Found {len(thumbnail_paths)} thumbnails.")
+        if not thumbnail_paths:
+            print("No thumbnails found. Please check the directory.")
+            return
+
+        random.shuffle(thumbnail_paths)
+
+        # Ensure the output directory exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"Created directory {output_dir}")
+
+        used_thumbnails = set()
+        image_count = 0
+        while thumbnail_paths and (max_images is None or image_count < max_images):
+            packed_thumbnails = self.pack_thumbnails(thumbnail_paths, canvas_size)
+            if not packed_thumbnails:
+                print("No more thumbnails can fit on the canvas.")
+                break
+
+            # Initialize the canvas
+            canvas = Image.new('RGB', canvas_size, color='white')
+
+            # Place thumbnails on the canvas
+            for rid, x, y, w, h in packed_thumbnails:
+                thumbnail = Image.open(rid)
+                if thumbnail.size != (w, h):
+                    thumbnail = thumbnail.rotate(90, expand=True)
+                canvas.paste(thumbnail, (x, y))
+                used_thumbnails.add(rid)
+
+            thumbnail_paths = list(set(thumbnail_paths) - used_thumbnails)
+
+            output_image_path = os.path.join(output_dir, f"mosaic_{image_count:04d}.png")
+            output_annotation_path = os.path.join(output_dir, f"mosaic_{image_count:04d}.txt")
+            canvas.save(output_image_path)
+           
+            print(f"Saved {output_image_path}")
+            
+            # Write YOLO annotations for each thumbnail
+            with open(output_annotation_path, 'w') as file:
+                for rid, x, y, w, h in packed_thumbnails:
+                    x_center = (x + w / 2) / canvas_size[0]
+                    y_center = (y + h / 2) / canvas_size[1]
+                    width = w / canvas_size[0]
+                    height = h / canvas_size[1]
+                    file.write(f"0 {x_center} {y_center} {width} {height}\n")
+
+            image_count += 1
+
+            if not thumbnail_paths:
+                thumbnail_paths = list(used_thumbnails)
+                random.shuffle(thumbnail_paths)
+                used_thumbnails.clear()
+
+        print(f"All done. Mosaic images created: {image_count}")
+        return image_count  # Add this line to return the count
+
+
+
+
 
     def set_progress_bar_maximum(self, max_value):
         self.progress_aug.setMaximum(max_value)
@@ -7005,19 +7170,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def process_images_triggered(self):
+        print("process_images_triggered called")
 
-
-        # Check if images_import is empty
         if not self.images_import:
             QMessageBox.warning(self, "Error", "No images to process.")
             return
 
-        # Output settings
         output_directory = os.path.dirname(self.images_import[0])
-        output_folder_name = "nonaugmented"  # default folder name
-
-        # Create a list to store all selected effects
         selected_effects = []
+
+        # Check for mosaic effect and other effects
+        if self.mosaic_effect:
+            print("Creating mosaic images")
+            processed_images_count = self.create_mosaic_images()  # Assign the returned count here
+            selected_effects.append("mosaic")
 
         if self.glass_effect:
             selected_effects.append("glass_effect")
@@ -7032,14 +7198,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         if self.flip_images:
             selected_effects.append("flip_images")
 
-        # Join selected effects with underscores or set to 'nonaugmented' if empty
+        # Determine the final output folder name
         output_folder_name = "_".join(selected_effects) if selected_effects else "nonaugmented"
-
         output_path = os.path.join(output_directory, output_folder_name)
 
+        # Ensure the output directory exists
         if not os.path.exists(output_path):
             os.makedirs(output_path)
-
 
         # Image and Label mapping
         image_files_map = {os.path.splitext(os.path.basename(p))[0]: p for p in self.images_import}
@@ -7051,10 +7216,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             label_path = label_files_map.get(image_base_name)
             if label_path is not None and os.path.basename(label_path) != "classes.txt":
                 self.apply_augmentations(current_image, image_path, label_path, output_path, output_folder_name, total_images)
-
                 processed_images_count += 1
 
         QMessageBox.information(self, "Success", f"{processed_images_count} images have been successfully processed.")
+
 
     def apply_augmentations(self, current_image, image_path, label_path, output_path, output_folder_name, total_images):
         image = cv2.imread(image_path)
@@ -7073,9 +7238,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 new_label = f"{int(class_id)} {x_center} {y_center} {width} {height}\n"  # Cast class_id to int
                 new_labels.append(new_label)
             labels = new_labels  # Update the labels
-
-        # Read YOLO label file and keep it the same.
-
 
         if labels:  # Check if labels are not empty
             # Parse the first label's information.
@@ -7118,7 +7280,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             if image is None:
                 return
 
-
         # Save the new image in the determined output folder
         output_image_path = os.path.join(output_path, f"{output_folder_name}_{current_image}.jpg")
         cv2.imwrite(output_image_path, image)
@@ -7138,6 +7299,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def import_images_triggered(self):
         directory = QFileDialog.getExistingDirectory(None, 'Select Image Directory')
         if directory:
+            self.thumbnail_dir = directory  # This should be set regardless of the files inside
             all_files = glob.glob(os.path.join(directory, '*'))
 
             self.images_import = []
@@ -7154,7 +7316,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 # Check if it's a label file
                 elif file_extension == '.txt':
                     self.label_files.append(file_path)
-
+                 
 
     # import stylesheet
     def populate_style_combo_box(self):
@@ -7182,88 +7344,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             with open(file_path, 'r', encoding="utf-8") as f:
                 stylesheet = f.read()
             self.setStyleSheet(stylesheet)
-
-
-     # convert json to yolo
-    def select_input_directory(self):
-        # Ask user to select input directory
-        self.input_dir = str(QtWidgets.QFileDialog.getExistingDirectory(
-            None, "Select input directory"))
-
-        # Set the text of inputLineEdit if it exists
-        if hasattr(self, 'inputLineEdit'):
-            self.inputLineEdit.setText(self.input_dir)
-        else:
-            print("Error: inputLineEdit is not initialized.")
-
-    def select_output_directory(self):
-        # Ask user to select output directory
-        output_dir = str(QtWidgets.QFileDialog.getExistingDirectory(None, "Select output directory"))
-        
-        # Set the text of outputLineEdit if it exists
-        if hasattr(self, 'outputLineEdit'):
-            self.outputLineEdit.setText(output_dir)
-        else:
-            print("Error: outputLineEdit is not initialized.")
-            return
-
-        # Check if input_dir is defined before calling convert_to_yolo
-        if self.input_dir is not None:
-            # Loop over JSON files in input directory and write YOLO files to output directory
-            self.convert_to_yolo(self.input_dir, output_dir)
-        else:
-            QMessageBox.warning(self, 'Warning', 'Please select an input directory.')
-
-
-    def select_classes_file(self):
-        # Ask user to select a classes file
-        classes_file, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, 'Select Classes File', '', 'Classes Files (*.txt)')
-        if classes_file:
-            # Load class names from selected file
-            with open(classes_file, 'r', encoding="utf-8") as file:
-                self.class_names = [line.strip() for line in file]
-            self.num_classes = len(self.class_names)
-
-    def convert_to_yolo(self, input_dir, output_dir):
-        # Loop over JSON files in input directory
-        for filename in os.listdir(input_dir):
-            if filename.endswith(".json"):
-                # Load JSON data from file
-                with open(os.path.join(input_dir, filename), 'r', encoding="utf-8") as f:
-                    data = json.load(f)
-                # Extract image dimensions
-                width = data['image']['width']
-                height = data['image']['height']
-
-                # Loop over marks in JSON data
-                for mark in data['mark']:
-                    # Extract class name and rectangle coordinates
-                    class_name = mark['name']
-                    x_min = int(mark['rect']['int_x'])
-                    y_min = int(mark['rect']['int_y'])
-                    x_max = x_min + int(mark['rect']['int_w'])
-                    y_max = y_min + int(mark['rect']['int_h'])
-
-                    # Calculate YOLO parameters
-                    x_center = (x_min + x_max) / (2.0 * width)
-                    y_center = (y_min + y_max) / (2.0 * height)
-                    w = int(mark['rect']['int_w']) / width
-                    h = int(mark['rect']['int_h']) / height
-
-                    # Write YOLO line to output file
-                    class_idx = self.class_names.index(
-                        class_name) if class_name in self.class_names else -1
-                    if class_idx != -1:
-                        line = f"{class_idx} {x_center:.10f} {y_center:.10f} {w:.10f} {h:.10f}"
-                        output_filename = os.path.splitext(filename)[
-                            0] + ".txt"
-                        output_path = os.path.join(output_dir, output_filename)
-                        with open(output_path, 'a', encoding="utf-8") as out_file:
-                            out_file.write(line + '\n')
-
-        QMessageBox.information(self, 'Information',
-                                ' .txt files created successfully!')
 
         # def for ultralytics train
 
@@ -7302,6 +7382,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         directory = QFileDialog.getExistingDirectory(self, "Select Save Directory", "", options=options)
         if directory:
             self.runs_directory = directory  # Update the save directory value
+
+
 
     def ultralytics_train_clicked(self):
         # Initialize variables
@@ -7345,9 +7427,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 command += " half=True"
             if self.amp_true.isChecked():
                 command += " amp=True"
-            if self.freeze.isChecked():
+            if self.freeze_checkbox.isChecked():
                 freeze_layers = self.freeze_input.value()  
-                command += f" freeze={freeze_layers}"
+                command += f" freeze={freeze_layers}"               
+            if self.patience_checkbox.isChecked():
+                patience_value = self.patience_input.text()  # assuming patience_input is a QLineEdit or similar
+                command += f" patience={patience_value}"
             print("Starting training process with command:", command)
 
         # Initialize and start the training process
