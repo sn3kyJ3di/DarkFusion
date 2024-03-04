@@ -137,16 +137,16 @@ To ensure a smooth installation process when setting up OpenCV with CUDA support
    winget install git.git
    winget install Kitware.CMake
    winget install Microsoft.VisualStudio.2022.Community
-  ```
+   ```
  
- **Note**: It's crucial to install Visual Studio before CUDA. If you change your Visual Studio version later, you'll need to reinstall CUDA.
+   **Note**: It's crucial to install Visual Studio before CUDA. If you change your Visual Studio version later, you'll need to reinstall CUDA.
     
-      click on the "Windows Start" menu and run "Visual Studio Installer"
-      click on Modify
-      select Desktop Development With C++
-      select python development
-      click on Modify in the bottom-right corner, and then click on Yes
-      After installation, A system restart is required.  ```
+      - click on the "Windows Start" menu and run "Visual Studio Installer"
+      - click on Modify
+      - select Desktop Development With C++
+      - select python development
+      - click on Modify in the bottom-right corner, and then click on Yes
+      - After installation, A system restart is required.  ```
 
 #### Installation
 
