@@ -248,11 +248,11 @@ To ensure a smooth installation process when setting up OpenCV with CUDA support
       ```
    - copy the files from `tensorrt-8.6.1.6\lib` folder to `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin`
 
-# Ultralytics
+### Ultralytics
 
 Ultralytics is pre-installed as part of this package. For documentation, visit the [Ultralytics documentation site](https://docs.ultralytics.com/).
 
-# Running UltraDarkFusion
+## Running UltraDarkFusion
 
 *Recommended:* Use Visual Studio Code for a smoother experience with the program.Download it here https://code.visualstudio.com/Download
 
