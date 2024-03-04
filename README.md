@@ -82,7 +82,7 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
     - Choose "Run as administrator" to execute the script.
 
 6. **Install Darknet**:
-   - There are various verions of Darknet available, at the time this readme was written, the HANK-AI/Darknet version was the most active and is the suggested version.  You can elect to use a different version, but your setup might be more complex
+   - There are various verions of Darknet available - at the time this readme was written, the HANK-AI/Darknet version was the most active and is the suggested version.  You can elect to use a different version, but your setup might be more complex
       
    #### Darknet Options
 
@@ -92,7 +92,7 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
 
    - [Darknet by AlexeyAB](https://github.com/AlexeyAB/darknet)
 
-      > **Disclaimer**: UltraDarkFusion may not fully support all versions of Darknet for visual UI output, although all versions are suitable for training. This is due to variances in output formats across different Darknet versions.
+> **Disclaimer**: UltraDarkFusion may not fully support all versions of Darknet for visual UI output, although all versions are suitable for training. This is due to variances in output formats across different Darknet versions.
 
    - In [Darknet by Hank-AI](https://github.com/hank-ai/darknet), there are various steps in the "Windows CMake Method that are redundant with steps in this installation: 
         - you will not need to instal Git again
@@ -183,19 +183,19 @@ To ensure a smooth installation process when setting up OpenCV with CUDA support
    - Once Anaconda is installed, locate the `fusion_install.bat` file in your UltraDarkFusion directory and right-click on it. Choose "Run as administrator" to execute the script.
 
 6. **Install Darknet**:
-   - There are various verions of Darknet available, at the time this readme was written, the HANK-AI/Darknet version was the most active and is the suggested version.  You can elect to use a different version, but your setup might be more complex
-      # Darknet Options
+   - There are various verions of Darknet available - at the time this readme was written, the HANK-AI/Darknet version was the most active and is the suggested version.  You can elect to use a different version, but your setup might be more complex
+      
+   #### Darknet Options
 
-      - [Darknet by Hank-AI](https://github.com/hank-ai/darknet) (Currently maintained as of 10/22/2023)
-      Discord: [https://discord.gg/fZTz8E44](https://discord.gg/fZTz8E44)
+   - [Darknet by Hank-AI](https://github.com/hank-ai/darknet)
 
-      - [Darknet by Umbralada](https://github.com/umbralada/darknet) (Recently updated as of 10/22/2023)
+   - [Darknet by Umbralada](https://github.com/umbralada/darknet)
 
-      - [Darknet by AlexeyAB](https://github.com/AlexeyAB/darknet) (No longer maintained)
+   - [Darknet by AlexeyAB](https://github.com/AlexeyAB/darknet)
 
-      > **Disclaimer**: UltraDarkFusion may not fully support all versions of Darknet for visual UI output, although all versions are suitable for training. This is due to variances in output formats across different Darknet versions.
+> **Disclaimer**: UltraDarkFusion may not fully support all versions of Darknet for visual UI output, although all versions are suitable for training. This is due to variances in output formats across different Darknet versions.
 
-   - In Hank-AI/Darknet There are various steps in the "Windows CMake Method that are redundant with steps in this installation 
+   - In [Darknet by Hank-AI](https://github.com/hank-ai/darknet), there are various steps in the "Windows CMake Method that are redundant with steps in this installation: 
     - you will not need to instal Git again
     - You will not need to install CMAKE again
     - You will not need to install Microsoft Visual Studio 2022 Community again
