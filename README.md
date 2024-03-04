@@ -1,6 +1,7 @@
 ![UltraDarkFusion GUI](fusion.gif)
 
-**UltraDarkFusion** is an advanced GUI application tailored for object detection, image processing, and computer vision. It simplifies workflows for collection, labeling, dataset management, model training, and visualization of real-time inferences.
+# UltraDarkFusion
+ An advanced GUI application tailored for object detection, image processing, and computer vision. It simplifies workflows for collection, labeling, dataset management, model training, and visualization of real-time inferences.
 
 ## Features
 - <b>Annotation Tools:</b> Customizable bounding box annotation with YOLO format conversion.
