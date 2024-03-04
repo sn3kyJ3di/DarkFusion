@@ -26,7 +26,7 @@ Before diving into the code, let's set up your environment with the necessary bu
 
 There are two options for installing UltraDarkFusion - Option #1 "OpenCL without CUDA" is the simplier of the two but you may see a slight reduction in performance, Option #2 "DNN with CUDA" is more complex to setup but will likely perform slightly better.  Both options require you to install darknet and it requires you to install CUDA and cuDNN.  Be advised that if you want the installation to go smoothly, you MUST use the exact versions as shown below and the exact folder structure as shown below. You may customize your installation but you will need to make complex modifications to it.
 
-### Option 1: OpenCL without CUDA
+### Installation Option 1: OpenCL without CUDA
 
 This guide outlines the installation of UltraDarkFusion without opencv_cuda.
 
@@ -80,18 +80,18 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
 
 6. **Install Darknet**:
    - There are various verions of Darknet available, at the time this readme was written, the HANK-AI/Darknet version was the most active and is the suggested version.  You can elect to use a different version, but your setup might be more complex
-      #### Darknet Options
+         # Darknet Options
 
-      - [Darknet by Hank-AI](https://github.com/hank-ai/darknet) (Currently maintained as of 10/22/2023)
-      Discord: [https://discord.gg/fZTz8E44](https://discord.gg/fZTz8E44)
+         - [Darknet by Hank-AI](https://github.com/hank-ai/darknet) (Currently maintained as of 10/22/2023)
+         Discord: [https://discord.gg/fZTz8E44](https://discord.gg/fZTz8E44)
 
-      - [Darknet by Umbralada](https://github.com/umbralada/darknet) (Recently updated as of 10/22/2023)
+         - [Darknet by Umbralada](https://github.com/umbralada/darknet) (Recently updated as of 10/22/2023)
 
-      - [Darknet by AlexeyAB](https://github.com/AlexeyAB/darknet) (No longer maintained)
+         - [Darknet by AlexeyAB](https://github.com/AlexeyAB/darknet) (No longer maintained)
 
       > **Disclaimer**: UltraDarkFusion may not fully support all versions of Darknet for visual UI output, although all versions are suitable for training. This is due to variances in output formats across different Darknet versions.
 
-   - In Hank-AI/Darknet There are various steps in the "Windows CMake Method that are redundant with steps in this installation: 
+   - In [Darknet by Hank-AI](https://github.com/hank-ai/darknet), there are various steps in the "Windows CMake Method that are redundant with steps in this installation: 
         - you will not need to instal Git again
         - You will not need to install CMAKE again
         - You will not need to install Microsoft Visual Studio 2022 Community again
@@ -105,7 +105,7 @@ This guide outlines the installation of UltraDarkFusion without opencv_cuda.
                 - Variable Name: Path
                 - C:\Program Files\NVIDIA\CUDNN\v8.x\bin
 
-### Option 2: DNN with CUDA
+### Installation Option 2: DNN with CUDA
 
 #### Preperation
 
@@ -113,7 +113,7 @@ Before proceeding with the installation, it's essential to assess your existing 
 
 Caution: It's recommended to run the program using OpenCL as there isn't a significant performance boost when utilizing .weights and .cfg files on CUDA, and the setup can be challenging. While PyTorch is installed and all .pt files are utilizing CUDA from PyTorch, compiling with opencv_cuda can be quite intricate.
 
-## Prerequisites: Clean Your PC
+#### Prerequisites: Clean Your PC
 
 To ensure a smooth installation process when setting up OpenCV with CUDA support, follow these actions:
 
